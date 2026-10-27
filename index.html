@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fluid Sandbox</title>
+  <meta name="description" content="A 2D Navier-Stokes sandbox: paint walls, inflows, fans, sources, sinks and curls, then release beads and see how many reach the goal.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=STIX+Two+Text:ital,wght@1,400;1,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Fluid Sandbox</h1>
+      <p class="eq" aria-label="Incompressible Navier-Stokes with forcing and sources: du/dt plus u dot grad u equals minus grad p plus nu laplacian u plus f, and divergence of u equals q">
+        <span>&part;<b>u</b>/&part;<i>t</i> + (<b>u</b>&middot;&nabla;)<b>u</b> = &minus;&nabla;<i>p</i> + <i>&nu;</i>&nabla;&sup2;<b>u</b> + <b>f</b></span>
+        <span>&nabla;&middot;<b>u</b> = <i>q</i></span>
+      </p>
+    </div>
+    <div class="top-actions">
+      <label class="examples">
+        <span>Example</span>
+        <select id="example"></select>
+      </label>
+      <button id="helpBtn" class="ghost" type="button">How it works</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside id="panel" class="panel" aria-label="Controls">
+      <section class="group lockable" aria-labelledby="h-paint">
+        <h2 id="h-paint">Paint</h2>
+        <div class="tools four" role="radiogroup" aria-label="Elements">
+          <button class="tool" data-tool="open" role="radio" title="Open fluid, also the eraser (1)"><span class="sw sw-open"></span><span>Open</span></button>
+          <button class="tool" data-tool="wall" role="radio" title="Wall (2)"><span class="sw sw-wall"></span><span>Wall</span></button>
+          <button class="tool" data-tool="goal" role="radio" title="Goal (3)"><span class="sw sw-goal"></span><span>Goal</span></button>
+          <button class="tool" data-tool="inflow" role="radio" title="Inflow (4)"><span class="sw sw-inflow"></span><span>Inflow</span></button>
+        </div>
+        <label class="slider">
+          <span>Brush</span>
+          <input id="brush" type="range" min="1" max="40" step="1" value="8">
+          <output id="brushOut">8</output>
+        </label>
+      </section>
+
+      <section class="group lockable" aria-labelledby="h-shape">
+        <h2 id="h-shape">Shape the flow</h2>
+        <div class="tools three" role="radiogroup" aria-label="Modifiers">
+          <button class="tool" data-tool="select" role="radio" title="Select a region, then rotate or scale its vectors (5)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9c0-3 3-5 7-5s7 2 7 5-3 5-7 5c-2 0-3 1-3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.5 2"/><circle cx="9" cy="19" r="1.6" fill="currentColor"/></svg>
+            <span>Select</span></button>
+          <button class="tool" data-tool="comb" role="radio" title="Comb: drag to paint velocity along your stroke (6)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 7h14M14 4l3 3-3 3"/><path d="M3 14h16M16 11l3 3-3 3"/><path d="M3 20h10"/></g></svg>
+            <span>Comb</span></button>
+          <button class="tool" data-tool="source" role="radio" title="Source: click to add (7)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="2.5" fill="currentColor"/><circle cx="12" cy="12" r="6" opacity=".7"/><circle cx="12" cy="12" r="9.5" opacity=".35"/></g></svg>
+            <span>Source</span></button>
+          <button class="tool" data-tool="sink" role="radio" title="Sink: click to add (8)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="2.5" fill="currentColor"/><circle cx="12" cy="12" r="6" opacity=".7"/><circle cx="12" cy="12" r="9.5" opacity="1" stroke-dasharray="3 2"/></g></svg>
+            <span>Sink</span></button>
+          <button class="tool" data-tool="curl-ccw" role="radio" title="Counterclockwise curl: click to add (9)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M18 8a7 7 0 1 0 1 6"/><path d="M18 3v5h-5"/></g></svg>
+            <span>Curl left</span></button>
+          <button class="tool" data-tool="curl-cw" role="radio" title="Clockwise curl: click to add (0)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 8a7 7 0 1 1-1 6"/><path d="M6 3v5h5"/></g></svg>
+            <span>Curl right</span></button>
+        </div>
+
+        <div id="vecBox" class="subpanel">
+          <div class="dial-row">
+            <div id="dial" class="dial" role="slider" tabindex="0" aria-label="Direction" aria-valuemin="-180" aria-valuemax="180" aria-valuenow="0">
+              <svg viewBox="0 0 64 64" aria-hidden="true">
+                <circle cx="32" cy="32" r="27" class="dial-ring"/>
+                <g id="dialNeedle"><line x1="32" y1="32" x2="54" y2="32"/><path d="M54 32l-7-4.5v9z"/></g>
+                <circle cx="32" cy="32" r="3"/>
+              </svg>
+            </div>
+            <div class="dial-meta">
+              <span class="dial-label">Direction</span>
+              <output id="dirOut">0&deg;</output>
+              <span class="hint" id="vecHint">Inflow direction</span>
+            </div>
+          </div>
+          <label class="slider">
+            <span>Speed</span>
+            <input id="speed" type="range" min="0" max="60" step="1" value="20">
+            <output id="speedOut">20</output>
+          </label>
+        </div>
+
+        <div id="strengthBox" class="subpanel">
+          <label class="slider">
+            <span>Strength</span>
+            <input id="strength" type="range" min="5" max="100" step="5" value="50">
+            <output id="strengthOut">50%</output>
+          </label>
+          <p class="hint">Radius follows the brush. Clicks add up.</p>
+        </div>
+
+        <div id="selBox" class="subpanel">
+          <p class="hint" id="selHint">Drag to lasso a region, click to pick a connected area. Shift adds, Alt removes.</p>
+          <div id="selControls" hidden>
+            <label class="slider">
+              <span>Rotate</span>
+              <input id="rot" type="range" min="-180" max="180" step="1" value="0">
+              <output id="rotOut">0&deg;</output>
+            </label>
+            <label class="slider">
+              <span>Magnitude</span>
+              <input id="mag" type="range" min="0" max="400" step="5" value="100">
+              <output id="magOut">100%</output>
+            </label>
+            <div class="btn-row">
+              <button id="selFill" type="button" title="Set every vector in the selection to the direction and speed above">Fill</button>
+              <button id="selZero" type="button" title="Set every vector in the selection to zero (Delete)">Zero</button>
+              <button id="selDone" type="button" title="Deselect (Esc)">Deselect</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="group lockable" aria-labelledby="h-run">
+        <h2 id="h-run">Run settings</h2>
+        <label class="slider">
+          <span>Max time</span>
+          <input id="maxTime" type="range" min="5" max="180" step="5" value="30">
+          <output id="maxTimeOut">30 s</output>
+        </label>
+        <label class="slider">
+          <span>Bead rate</span>
+          <input id="rate" type="range" min="0" max="200" step="5" value="50">
+          <output id="rateOut">50/s</output>
+        </label>
+        <label class="slider">
+          <span>Viscosity</span>
+          <input id="visc" type="range" min="-3" max="1" step="0.05" value="-2">
+          <output id="viscOut">0.01</output>
+        </label>
+        <label class="slider">
+          <span>Bead size</span>
+          <input id="beadR" type="range" min="0.25" max="1.5" step="0.05" value="0.45">
+          <output id="beadROut">0.45</output>
+        </label>
+        <label class="slider">
+          <span>Inertia</span>
+          <input id="inertia" type="range" min="-2" max="0" step="0.05" value="-1.2">
+          <output id="inertiaOut">0.06 s</output>
+        </label>
+        <div class="seg" role="radiogroup" aria-label="Tank edges">
+          <span>Edges</span>
+          <button type="button" data-edges="open" role="radio">Open</button>
+          <button type="button" data-edges="walls" role="radio">Walls</button>
+        </div>
+      </section>
+
+      <section class="group actions" aria-label="Actions">
+        <button id="simulate" class="primary" type="button">Simulate</button>
+        <div class="btn-row lockable">
+          <button id="save" type="button">Save</button>
+          <button id="load" type="button">Load</button>
+        </div>
+        <div class="btn-row lockable">
+          <button id="undo" type="button" title="Undo (Ctrl+Z)">Undo</button>
+          <button id="redo" type="button" title="Redo (Ctrl+Y)">Redo</button>
+          <button id="clear" type="button" title="Clear the tank">Clear</button>
+        </div>
+        <label class="name lockable">
+          <span>Name</span>
+          <input id="name" type="text" maxlength="60" spellcheck="false" autocomplete="off">
+        </label>
+      </section>
+    </aside>
+
+    <section class="stage" id="stage">
+      <div class="tankcol" id="tankcol">
+        <div class="statusbar" id="statusbar">
+          <div class="edit-status" id="editStatus">
+            <p id="toolHint" class="tool-hint"></p>
+            <p id="readout" class="readout" aria-live="off"></p>
+          </div>
+          <div id="hud" class="hud" hidden>
+            <div class="hud-score"><output id="hudPct">0%</output><span>reached the goal</span></div>
+            <div class="hud-time">
+              <div class="bar"><i id="hudBar"></i></div>
+              <output id="hudClock">0.0 / 30 s</output>
+            </div>
+            <dl class="hud-counts">
+              <div><dt>Released</dt><dd id="hudEmitted">0</dd></div>
+              <div><dt>In goal</dt><dd id="hudGreen">0</dd></div>
+              <div><dt>Lost</dt><dd id="hudLost">0</dd></div>
+            </dl>
+            <div class="hud-ctrl">
+              <div class="speed" role="radiogroup" aria-label="Playback speed">
+                <button type="button" data-speed="1" role="radio">1x</button>
+                <button type="button" data-speed="2" role="radio">2x</button>
+                <button type="button" data-speed="4" role="radio">4x</button>
+              </div>
+              <button id="hudArrows" type="button" class="ghost small" aria-pressed="true">Arrows</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="frame" id="frame">
+          <canvas id="tank" aria-label="Fluid tank"></canvas>
+
+          <div id="result" class="result" hidden role="dialog" aria-labelledby="resultPct">
+            <p class="result-pct" id="resultPct">0%</p>
+            <p class="result-sub" id="resultSub">of released beads reached the goal</p>
+            <dl class="result-counts">
+              <div><dt>Released</dt><dd id="rEmitted">0</dd></div>
+              <div><dt>Reached goal</dt><dd id="rGreen">0</dd></div>
+              <div><dt>Lost</dt><dd id="rLost">0</dd></div>
+              <div><dt>Still in tank</dt><dd id="rAlive">0</dd></div>
+            </dl>
+            <div class="btn-row">
+              <button id="again" type="button">Run again</button>
+              <button id="back" type="button" class="primary">Back to editor</button>
+            </div>
+          </div>
+
+          <p id="toast" class="toast" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="loadDialog" class="dialog">
+    <form method="dialog">
+      <h2>Load a scenario</h2>
+      <ol class="steps">
+        <li>
+          <div><strong>Map image</strong><span class="hint">The .png saved by Save, or any image drawn with the key colors.</span></div>
+          <button id="pickPng" type="button">Choose map</button>
+          <span id="pngName" class="file"></span>
+        </li>
+        <li>
+          <div><strong>Velocity file</strong><span class="hint">The matching .flow.json. Skip it to start from still water.</span></div>
+          <button id="pickJson" type="button" disabled>Choose velocity file</button>
+          <span id="jsonName" class="file"></span>
+        </li>
+      </ol>
+      <p id="loadMsg" class="msg" role="alert"></p>
+      <div class="btn-row end">
+        <button value="cancel" type="submit" class="ghost">Cancel</button>
+        <button id="loadApply" type="button" class="primary" disabled>Load</button>
+      </div>
+      <input id="filePng" type="file" accept="image/png,image/*" hidden>
+      <input id="fileJson" type="file" accept=".json,application/json" hidden>
+    </form>
+  </dialog>
+
+  <dialog id="helpDialog" class="dialog wide">
+    <form method="dialog">
+      <h2>How it works</h2>
+      <p>The tank solves the incompressible Navier-Stokes equations on a staggered grid. Each step applies your fans, carries the velocity along itself (advection), spreads it by viscosity, then solves for the pressure that makes the flow obey <i>&nabla;&middot;<b>u</b> = q</i>: zero everywhere except at sources and sinks.</p>
+      <h3>Elements</h3>
+      <ul>
+        <li><b>Open</b> is plain fluid. Painting it also erases anything else.</li>
+        <li><b>Wall</b> is solid and no-slip. Beads bounce off it.</li>
+        <li><b>Goal</b> is fluid that turns any bead touching it green for good.</li>
+        <li><b>Inflow</b> holds a fixed velocity and releases beads in proportion to its speed. Set its direction with the dial before painting, or select it afterward and rotate it.</li>
+      </ul>
+      <h3>Shaping the flow</h3>
+      <ul>
+        <li>Velocity painted on open fluid acts as a <b>fan</b>: during a run the fluid there is pulled toward that velocity, while the rest of the tank responds through pressure and viscosity.</li>
+        <li><b>Select</b> a region to rotate or scale its vectors. Drag the knob on the ring to rotate, or scroll over the tank to scale (Shift + scroll rotates).</li>
+        <li><b>Comb</b> paints velocity along the direction you drag.</li>
+        <li><b>Sources</b> and <b>sinks</b> add or remove fluid. Sinks also swallow beads, at the same rate they drain fluid.</li>
+        <li><b>Curls</b> stamp a vortex into the fan field, so they keep stirring for the whole run.</li>
+      </ul>
+      <h3>Reading the tank</h3>
+      <p>Arrows show velocity, colored slate to amber by speed. Rose tint is counterclockwise spin and blue is clockwise. Amber glow is a source and violet is a sink. With open edges, fluid and beads can leave the tank; with walls, an inflow needs a sink to make room.</p>
+      <h3>Keys</h3>
+      <p class="keys"><kbd>1</kbd>-<kbd>4</kbd> elements, <kbd>5</kbd>-<kbd>0</kbd> modifiers, <kbd>[</kbd> <kbd>]</kbd> brush size, <kbd>Space</kbd> simulate or stop, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Y</kbd> redo, <kbd>Esc</kbd> deselect.</p>
+      <h3>Files</h3>
+      <p>Save downloads two files: a map PNG with one pixel per cell (black open, gray #808080 wall, white goal, cyan #00FFFF inflow) and a .flow.json with the velocity and divergence fields and run settings. You can draw maps in any paint program with those four colors and load them.</p>
+      <div class="btn-row end"><button value="close" type="submit" class="primary">Close</button></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
